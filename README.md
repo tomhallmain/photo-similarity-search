@@ -1,3 +1,19 @@
+# Local Image Similarity Search App
+
+Forked version of the original project by [@harperreed](https://github.com/harperreed).
+
+The following are changes from the original:
+- Expands image file types to a configurable list
+- Adds a masonry layout to the UI (Macy)
+- Makes number of result images in UI configurable
+- Enables the application to use multiple directories of images in one database
+- Enables CLIP embedding handling for other platforms using CLIP python module
+- Makes CLIP model configurable
+- Adds special handling for resizing images in UI
+
+
+# Original Project README
+
 # 📸 Embed-Photos 🖼️
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -7,12 +23,12 @@ Welcome to Embed-Photos, a powerful photo similarity search engine built by [@ha
 ## 🌟 Features
 
 - 🚀 Fast and efficient image search using the CLIP model
-- 💻 Works on Apple Silicon (MLX) only
+- 💻 Works on Apple Silicon (MLX) ~~only~~ **as well as other platforms**
 - 💾 Persistent storage of image embeddings using SQLite and Chroma
 - 🌐 Web interface for easy interaction and exploration
 - 🔒 Secure image serving and handling
 - 📊 Logging and monitoring for performance analysis
-- 🔧 Configurable settings using environment variables
+- 🔧 Configurable settings using ~~environment variables~~ **JSON config files**
 
 ## Screenshot
 

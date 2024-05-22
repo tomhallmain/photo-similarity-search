@@ -6,3 +6,5 @@ chroma-*.log
 *.pyc
 mlx_model
 .env
+configs/*.json
+!configs/config_example.json

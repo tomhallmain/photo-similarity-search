@@ -8,19 +8,29 @@
 {% endblock %}
 
 {% block content %}
-<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+<div class="images-grid">
     {% for image in images %}
-    <a href="/image/{{image.id}}">
-        <div
-            class="bg-card text-card-foreground rounded-lg border shadow-sm"
-            data-v0-t="card"
-        >
-        <img  class="h-48 w-full object-cover"
-        style="aspect-ratio: 400 / 300; object-fit: cover" src="{{ image.url }}" alt="image" />
+      <div class="item">
+        <div class="box">
+          <a href="/image/{{image.id}}">
+            <img class="image" src="{{ image.url }}" alt="image" />
+          </a>
         </div>
-    </a>
+      </div>
     {% endfor %}
 </div>
+<script src="{{ url_for('static', filename='imgStatus.js') }}"></script>
+<script src="{{ url_for('static', filename='macy.js') }}"></script>
+<script>
+    imgStatus.watch('.image', function(imgs) {
+    if (imgs.isDone()) {
+      console.log("Images finished loading!");
+      Macy({container: ".images-grid"});
+    }
+    });
+    window.addEventListener('resize', function () {
+      Macy({container: ".images-grid"});
+    });
+</script>
 {% endblock %}
-
 {% block js %} {% endblock %}

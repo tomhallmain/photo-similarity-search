@@ -1,80 +1,20 @@
 import os
 import msgpack
-import socket
-import uuid
-import logging
 import time
 from dotenv import load_dotenv
 import sqlite3
-import hashlib
-import requests
-from io import BytesIO
 import signal
+import hashlib
 from concurrent.futures import ThreadPoolExecutor
-from logging.handlers import RotatingFileHandler
 import chromadb
-import json
-import numpy as np
 
-import mlx_clip
-
-
-# Generate unique ID for the machine
-host_name = socket.gethostname()
-unique_id = uuid.uuid5(uuid.NAMESPACE_DNS, host_name + str(uuid.getnode()))
+from config import config
+from log_config import get_logger
+from model import image_embeddings
 
 # Configure logging
-log_app_name = "app"
-log_level = os.getenv('LOG_LEVEL', 'INFO')
-log_level = getattr(logging, log_level.upper())
-
-file_handler = RotatingFileHandler(f"{log_app_name}_{unique_id}.log", maxBytes=10485760, backupCount=10)
-file_handler.setLevel(log_level)
-file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(file_formatter)
-
-console_handler = logging.StreamHandler()
-console_handler.setLevel(log_level)
-console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(console_formatter)
-
-logger = logging.getLogger(log_app_name)
-logger.setLevel(log_level)
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
-
-# Load environment variables
-load_dotenv()
-
-
-
-logger.info(f"Running on machine ID: {unique_id}")
-
-# Retrieve values from .env
-DATA_DIR = os.getenv('DATA_DIR', './')
-SQLITE_DB_FILENAME = os.getenv('DB_FILENAME', 'images.db')
-FILELIST_CACHE_FILENAME = os.getenv('CACHE_FILENAME', 'filelist_cache.msgpack')
-SOURCE_IMAGE_DIRECTORY = os.getenv('IMAGE_DIRECTORY', 'images')
-CHROMA_DB_PATH = os.getenv('CHROME_PATH', f"{DATA_DIR}/{unique_id}_chroma")
-CHROMA_COLLECTION_NAME = os.getenv('CHROME_COLLECTION', "images")
-CLIP_MODEL = os.getenv('CLIP_MODEL', "openai/clip-vit-base-patch32")
-
-logger.debug("Configuration loaded.")
-# Log the configuration for debugging
-logger.debug(f"Configuration - DATA_DIR: {DATA_DIR}")
-logger.debug(f"Configuration - DB_FILENAME: {SQLITE_DB_FILENAME}")
-logger.debug(f"Configuration - CACHE_FILENAME: {FILELIST_CACHE_FILENAME}")
-logger.debug(f"Configuration - IMAGE_DIRECTORY: {SOURCE_IMAGE_DIRECTORY}")
-logger.debug(f"Configuration - CHROME_PATH: {CHROMA_DB_PATH}")
-logger.debug(f"Configuration - CHROME_COLLECTION: {CHROMA_COLLECTION_NAME}")
-logger.debug(f"Configuration - CLIP_MODEL: {CLIP_MODEL}")
-logger.debug("Configuration loaded.")
-
-# Append the unique ID to the db file path and cache file path
-SQLITE_DB_FILEPATH = f"{DATA_DIR}{str(unique_id)}_{SQLITE_DB_FILENAME}"
-FILELIST_CACHE_FILEPATH = os.path.join(DATA_DIR, f"{unique_id}_{FILELIST_CACHE_FILENAME}")
-
-
+logger, log_level = get_logger("app")
+config.log(logger)
 
 # Graceful shutdown handler
 def graceful_shutdown(signum, frame):
@@ -88,16 +28,16 @@ def graceful_shutdown(signum, frame):
 signal.signal(signal.SIGINT, graceful_shutdown)
 signal.signal(signal.SIGTERM, graceful_shutdown)
 
-#Instantiate MLX Clip model
-clip = mlx_clip.mlx_clip("mlx_model", hf_repo=CLIP_MODEL)
+# Load environment variables
+load_dotenv()
 
 # Check if data dir exists, if it doesn't - then create it
-if not os.path.exists(DATA_DIR):
+if not os.path.exists(config.DATA_DIR):
     logger.info("Creating data directory ...")
-    os.makedirs(DATA_DIR)
+    os.makedirs(config.DATA_DIR)
     
 # Create a connection pool for the SQLite database
-connection = sqlite3.connect(SQLITE_DB_FILEPATH)
+connection = sqlite3.connect(config.SQLITE_DB_FILEPATH)
 
 def create_table():
     """
@@ -120,19 +60,20 @@ def create_table():
 
 
 
-def file_generator(directory):
+def file_generator(directories):
     """
     Generates file paths for all files in the specified directory and its subdirectories.
 
     :param directory: The directory path to search for files.
     :return: A generator yielding file paths.
     """
-    logger.debug(f"Generating file paths for directory: {directory}")
-    for root, _, files in os.walk(directory):
-        for file in files:
-            yield os.path.join(root, file)
+    for directory in directories:
+        logger.debug(f"Generating file paths for directory: {directory}")
+        for root, _, files in os.walk(directory):
+            for file in files:
+                yield os.path.join(root, file)
 
-def hydrate_cache(directory, cache_file_path):
+def hydrate_cache(directories, cache_file_path):
     """
     Loads or generates a cache of file paths for the specified directory.
 
@@ -140,7 +81,7 @@ def hydrate_cache(directory, cache_file_path):
     :param cache_file_path: The path to the cache file.
     :return: A list of cached file paths.
     """
-    logger.info(f"Hydrating cache for {directory} using {cache_file_path}...")
+    logger.info(f"Hydrating cache for {directories} using {cache_file_path}...")
     if os.path.exists(cache_file_path):
         try:
             with open(cache_file_path, 'rb') as f:
@@ -148,19 +89,19 @@ def hydrate_cache(directory, cache_file_path):
             logger.info(f"Loaded cached files from {cache_file_path}")
             if len(cached_files) == 0:
                 logger.warning(f"Cache file {cache_file_path} is empty. Regenerating cache...")
-                cached_files = list(file_generator(directory))
+                cached_files = list(file_generator(directories))
                 with open(cache_file_path, 'wb') as f:
                     msgpack.dump(cached_files, f)
                 logger.info(f"Regenerated cache with {len(cached_files)} files and dumped to {cache_file_path}")
         except (msgpack.UnpackException, IOError) as e:
             logger.error(f"Error loading cache file {cache_file_path}: {e}. Regenerating cache...")
-            cached_files = list(file_generator(directory))
+            cached_files = list(file_generator(directories))
             with open(cache_file_path, 'wb') as f:
                 msgpack.dump(cached_files, f)
             logger.info(f"Regenerated cache with {len(cached_files)} files and dumped to {cache_file_path}")
     else:
-        logger.info(f"Cache file not found at {cache_file_path}. Creating cache dirlist for {directory}...")
-        cached_files = list(file_generator(directory))
+        logger.info(f"Cache file not found at {cache_file_path}. Creating cache dirlist for {directories}...")
+        cached_files = list(file_generator(directories))
         try:
             with open(cache_file_path, 'wb') as f:
                 msgpack.dump(cached_files, f)
@@ -178,7 +119,7 @@ def update_db(image):
     """
     try:
         embeddings_blob = sqlite3.Binary(msgpack.dumps(image.get('embeddings', [])))
-        with sqlite3.connect(SQLITE_DB_FILEPATH) as conn:
+        with sqlite3.connect(config.SQLITE_DB_FILEPATH) as conn:
             conn.execute("UPDATE images SET embeddings = ? WHERE filename = ?",
                          (embeddings_blob, image['filename']))
         logger.debug(f"Database updated successfully for image: {image['filename']}")
@@ -198,7 +139,7 @@ def process_image(file_path):
     file_md5 = hashlib.md5(file_content).hexdigest()
     conn = None
     try:
-        conn = sqlite3.connect(SQLITE_DB_FILEPATH)
+        conn = sqlite3.connect(config.SQLITE_DB_FILEPATH)
         with conn:
             cursor = conn.cursor()
             cursor.execute('''
@@ -233,7 +174,7 @@ def process_embeddings(photo):
 
     try:
         start_time = time.time()
-        imemb = clip.image_encoder(photo['file_path'])
+        imemb = image_embeddings(photo['file_path'])
         photo['embeddings'] = imemb
         update_db(photo)
         end_time = time.time()
@@ -247,21 +188,24 @@ def main():
     Main function to process images and embeddings.
     """
     cache_start_time = time.time()
-    cached_files = hydrate_cache(SOURCE_IMAGE_DIRECTORY, FILELIST_CACHE_FILEPATH)
+    cached_files = hydrate_cache(config.SOURCE_IMAGE_DIRECTORIES, config.FILELIST_CACHE_FILEPATH)
     cache_end_time = time.time()
     logger.info(f"Cache operation took {cache_end_time - cache_start_time:.2f} seconds")
-    logger.info(f"Directory has {len(cached_files)} files: {SOURCE_IMAGE_DIRECTORY}")
+    logger.info(f"Directory has {len(cached_files)} files: {config.SOURCE_IMAGE_DIRECTORIES}")
 
     create_table()
 
     with ThreadPoolExecutor() as executor:
         futures = []
         for file_path in cached_files:
-            if file_path.lower().endswith('.jpg'):
-                future = executor.submit(process_image, file_path)
-                futures.append(future)
+            for extension in config.FILE_TYPES:
+                if file_path.lower().endswith("." + extension):
+                    future = executor.submit(process_image, file_path)
+                    futures.append(future)
+                    break
         for future in futures:
             future.result()
+
     with connection:
         cursor = connection.cursor()
         cursor.execute("SELECT filename, file_path, file_date, file_md5, embeddings FROM images")
@@ -271,7 +215,7 @@ def main():
 
     num_photos = len(photos)
 
-    logger.info(f"Loaded {len(photos)} photos from database")
+    logger.info(f"Loaded {num_photos} photos from database")
     #cant't use ThreadPoolExecutor here because of the MLX memory thing
     start_time = time.time()
     photo_ite = 0
@@ -287,9 +231,9 @@ def main():
     logger.info("Database connection pool closed.")
 
 
-    logger.info(f"Initializing Chrome DB:  {CHROMA_COLLECTION_NAME}")
-    client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
-    collection = client.get_or_create_collection(name=CHROMA_COLLECTION_NAME)
+    logger.info(f"Initializing Chrome DB:  {config.CHROMA_COLLECTION_NAME}")
+    client = chromadb.PersistentClient(path=config.CHROMA_DB_PATH)
+    collection = client.get_or_create_collection(name=config.CHROMA_COLLECTION_NAME)
 
     logger.info(f"Generated embeddings for {len(photos)} photos")
     start_time = time.time()

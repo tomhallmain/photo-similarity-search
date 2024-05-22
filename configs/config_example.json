@@ -1,0 +1,19 @@
+{
+    "DATA_DIR": "./data",
+    "DB_FILENAME": "images.db",
+    "CACHE_FILENAME": "filelist_cache.msgpack",
+    "SOURCE_IMAGE_DIRECTORIES": [
+        "D:\\img",
+        "D:\\stable-diffusion-webui\\log\\images"
+    ],
+    "CHROMA_COLLECTION_NAME": "images",
+    "NUM_IMAGE_RESULTS": 52,
+    "CLIP_MODEL": "ViT-B/32",
+    "FILE_TYPES": [
+        "jpg",
+        "jpeg",
+        "png",
+        "webp"
+    ]
+}
+
