@@ -10,6 +10,7 @@ The following are changes from the original:
 - Enables CLIP embedding handling for other platforms using CLIP python module
 - Makes CLIP model configurable
 - Adds special handling for resizing images in UI
+- Makes external hosting a configrable option
 
 
 # Original Project README
@@ -86,8 +87,8 @@ embed-photos/
 ## Todo
 
 - Use siglip instead of clip
-- add a more robust config
-- make mlx optional
+- ~~add a more robust config~~
+- ~~make mlx optional~~
 
 ## 🙏 Acknowledgments
 

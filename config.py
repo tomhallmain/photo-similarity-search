@@ -27,6 +27,7 @@ class Config:
         self.NUM_IMAGE_RESULTS = 52
         self.CLIP_MODEL = "ViT-B/32"
         self.FILE_TYPES = [".jpg", ".jpeg", ".png", ".webp"]
+        self.ENABLE_EXTERNAL_CONNECTIONS = True
 
         self.set_values(str,
                         "CLIP_MODEL",
@@ -37,6 +38,8 @@ class Config:
                         "CHROMA_COLLECTION_NAME")
         self.set_values(int,
                         "NUM_IMAGE_RESULTS")
+        self.set_values(bool,
+                        "ENABLE_EXTERNAL_CONNECTIONS")
         self.set_values(list,
                         "FILE_TYPES",
                         "SOURCE_IMAGE_DIRECTORIES")

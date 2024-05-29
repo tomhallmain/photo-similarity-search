@@ -204,4 +204,9 @@ def serve_image(filename, resize=True):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0")
+    if config.ENABLE_EXTERNAL_CONNECTIONS:
+        app.run(debug=True, host="0.0.0.0")
+        print("Flask app is exposed to external connections. Set config option ENABLE_EXTERNAL_CONNECTION to false to change this.")
+    else:
+        print("Flask app will not be exposed to external connections. Set config option ENABLE_EXTERNAL_CONNECTION to true to change this.")
+        app.run(debug=True)
