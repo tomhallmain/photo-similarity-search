@@ -1,13 +1,16 @@
 import json
 import os
 import socket
+import sys
 import uuid
 
 
 class Config:
-    CONFIG_FILE_LOC = os.path.join(os.path.abspath(os.path.dirname(__file__)), "configs", "config.json")
+    CONFIG_NAME = "config" if len(sys.argv) < 2 else sys.argv[1]
+    CONFIG_FILE_LOC = os.path.join(os.path.abspath(os.path.dirname(__file__)), "configs", CONFIG_NAME + ".json")
 
     def __init__(self):
+        print(f"Using config: {Config.CONFIG_NAME}")
         self._dict = {}
         if not os.path.exists(Config.CONFIG_FILE_LOC):
             print(Config.CONFIG_FILE_LOC)
